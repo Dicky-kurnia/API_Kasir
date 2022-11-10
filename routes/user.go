@@ -4,6 +4,8 @@ import (
 	"errors"
 	"kasir/database"
 	"kasir/models"
+	"kasir/utils"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -19,13 +21,13 @@ type User struct {
 
 func CreateResponseUser(userModel models.User) User {
 	return User{
-		ID:       int(userModel.ID),
-		Name:     userModel.Name,
-		Email:    userModel.Email,
-		Address:  userModel.Address,
-		Phone:    userModel.Phone,
-		Password: userModel.Password,
+		ID:      int(userModel.ID),
+		Name:    userModel.Name,
+		Email:   userModel.Email,
+		Address: userModel.Address,
+		Phone:   userModel.Phone,
 	}
+
 }
 
 // Create User
@@ -36,9 +38,32 @@ func CreateUser(c *fiber.Ctx) error {
 		return c.Status(400).JSON(err.Error())
 	}
 
-	database.DB.Create(&user)
-	responseUser := CreateResponseUser(user)
-	return c.Status(200).JSON(responseUser)
+	newUser := models.User{
+		Name:    user.Name,
+		Email:   user.Email,
+		Address: user.Address,
+		Phone:   user.Phone,
+	}
+
+	hassedPassword, err := utils.HashingPassword(user.Password)
+	if err != nil {
+		log.Println(err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"Message": "Internal server error",
+		})
+	}
+	newUser.Password = hassedPassword
+
+	errCreateUser := database.DB.Create(&newUser).Error
+	if errCreateUser != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"message": "failed to store data",
+		})
+	}
+	return c.JSON(fiber.Map{
+		"message": "Succes",
+		"data":    newUser,
+	})
 }
 
 // GetAllUser
